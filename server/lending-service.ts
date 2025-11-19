@@ -46,7 +46,7 @@ interface TokenInfo {
 /**
  * Get token info from Jupiter or DexScreener API
  */
-async function getTokenInfo(tokenMint: string): Promise<TokenInfo | null> {
+export async function getTokenInfo(tokenMint: string): Promise<TokenInfo | null> {
   try {
     // Try DexScreener API first
     const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);

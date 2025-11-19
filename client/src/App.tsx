@@ -16,6 +16,7 @@ import VolumeBot from "@/pages/volume-bot";
 import TradingBot from "@/pages/trading-bot";
 import AIBot from "@/pages/ai-bot";
 import Blacklist from "@/pages/blacklist";
+import Lending from "@/pages/lending";
 import Whitepaper from "@/pages/whitepaper";
 import PublicStats from "@/pages/public-stats";
 import TokenAnalyzer from "@/pages/token-analyzer";
@@ -74,6 +75,11 @@ function Router() {
       <Route path="/dashboard/blacklist">
         <DashboardLayout>
           <Blacklist />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/lending">
+        <DashboardLayout>
+          <Lending />
         </DashboardLayout>
       </Route>
       <Route component={NotFound} />
