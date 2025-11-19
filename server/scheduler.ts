@@ -546,6 +546,32 @@ class BuybackScheduler {
     this.tasks = [];
     console.log("Scheduler stopped");
   }
+
+  // Add lending system health monitoring
+  async initializeLendingMonitor() {
+    if (!this.config.enabled) {
+      return;
+    }
+
+    // Monitor loan health every hour
+    const lendingTask = cron.schedule("0 * * * *", async () => {
+      await this.monitorLoanHealth();
+    });
+    
+    this.tasks.push(lendingTask);
+    console.log("Lending health monitor initialized - checking every hour");
+  }
+
+  private async monitorLoanHealth() {
+    try {
+      console.log("🏦 Starting loan health monitoring...");
+      const { monitorAllLoans } = await import("./lending-service");
+      await monitorAllLoans();
+      console.log("✅ Loan health monitoring complete");
+    } catch (error: any) {
+      console.error("❌ Error monitoring loan health:", error);
+    }
+  }
 }
 
 export const scheduler = new BuybackScheduler();
