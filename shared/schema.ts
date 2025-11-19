@@ -435,6 +435,135 @@ export const aiRecoveryMode = pgTable("ai_recovery_mode", {
 
 // No relations for aiBotConfigs, tokenBlacklist, tradeJournal, or aiRecoveryMode - all are standalone
 
+// ============================================================================
+// MEMECOIN CREDIT SYSTEM TABLES
+// ============================================================================
+
+// Lending Pool - Stores lender deposits (uses PDA vaults on-chain)
+export const lendingPool = pgTable("lending_pool", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lenderWalletAddress: text("lender_wallet_address").notNull(),
+  depositedSOL: decimal("deposited_sol", { precision: 18, scale: 9 }).notNull(),
+  availableSOL: decimal("available_sol", { precision: 18, scale: 9 }).notNull(), // Amount not currently loaned out
+  totalEarnedInterest: decimal("total_earned_interest", { precision: 18, scale: 9 }).notNull().default("0"),
+  depositTxSignature: text("deposit_tx_signature").notNull(),
+  vaultPDA: text("vault_pda"), // PDA address of the lending pool vault
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  lenderIdx: index("lending_pool_lender_idx").on(table.lenderWalletAddress),
+}));
+
+// Loan Positions - Tracks active loans against memecoin collateral (uses PDA vaults)
+export const loanPositions = pgTable("loan_positions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  borrowerWalletAddress: text("borrower_wallet_address").notNull(),
+  
+  // Loan details
+  borrowedSOL: decimal("borrowed_sol", { precision: 18, scale: 9 }).notNull(),
+  outstandingSOL: decimal("outstanding_sol", { precision: 18, scale: 9 }).notNull(), // Principal + interest
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).notNull(), // Annual % rate
+  
+  // Collateral details
+  collateralTokenMint: text("collateral_token_mint").notNull(),
+  collateralTokenSymbol: text("collateral_token_symbol"),
+  collateralTokenName: text("collateral_token_name"),
+  collateralAmount: decimal("collateral_amount", { precision: 30, scale: 9 }).notNull(),
+  collateralValueSOL: decimal("collateral_value_sol", { precision: 18, scale: 9 }).notNull(), // Value at time of loan
+  collateralMarketCapUSD: decimal("collateral_market_cap_usd", { precision: 18, scale: 2 }).notNull(), // Must be >= 5M
+  loanToValueRatio: decimal("loan_to_value_ratio", { precision: 5, scale: 2 }).notNull(), // LTV % (e.g., 20-70% based on market cap)
+  collateralVaultPDA: text("collateral_vault_pda"), // PDA address holding the collateral tokens
+  
+  // Liquidation parameters
+  liquidationThreshold: decimal("liquidation_threshold", { precision: 5, scale: 2 }).notNull(), // LTV % at which liquidation occurs
+  isLiquidated: boolean("is_liquidated").notNull().default(false),
+  liquidatedAt: timestamp("liquidated_at"),
+  liquidationTxSignature: text("liquidation_tx_signature"),
+  
+  // Tracking
+  borrowTxSignature: text("borrow_tx_signature").notNull(),
+  lastHealthCheckAt: timestamp("last_health_check_at").notNull().defaultNow(),
+  currentCollateralValueSOL: decimal("current_collateral_value_sol", { precision: 18, scale: 9 }), // Updated regularly
+  currentLTV: decimal("current_ltv", { precision: 5, scale: 2 }), // Current loan-to-value ratio
+  
+  isActive: boolean("is_active").notNull().default(true), // False when fully repaid
+  repaidAt: timestamp("repaid_at"),
+  repaymentTxSignature: text("repayment_tx_signature"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  borrowerIdx: index("loan_positions_borrower_idx").on(table.borrowerWalletAddress),
+  activeIdx: index("loan_positions_active_idx").on(table.isActive),
+  collateralIdx: index("loan_positions_collateral_idx").on(table.collateralTokenMint),
+}));
+
+// Collateral Valuation History - Tracks collateral value over time for risk management
+export const collateralValuations = pgTable("collateral_valuations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loanId: varchar("loan_id").notNull().references(() => loanPositions.id),
+  tokenMint: text("token_mint").notNull(),
+  priceSOL: decimal("price_sol", { precision: 18, scale: 9 }).notNull(),
+  marketCapUSD: decimal("market_cap_usd", { precision: 18, scale: 2 }).notNull(),
+  liquidityUSD: decimal("liquidity_usd", { precision: 18, scale: 2 }),
+  volumeUSD24h: decimal("volume_usd_24h", { precision: 18, scale: 2 }),
+  collateralValueSOL: decimal("collateral_value_sol", { precision: 18, scale: 9 }).notNull(),
+  ltvRatio: decimal("ltv_ratio", { precision: 5, scale: 2 }).notNull(),
+  healthFactor: decimal("health_factor", { precision: 10, scale: 4 }).notNull(), // > 1.0 is healthy
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  loanIdx: index("collateral_valuations_loan_idx").on(table.loanId),
+  createdAtIdx: index("collateral_valuations_created_at_idx").on(table.createdAt),
+}));
+
+// Interest Payments - Tracks interest payments on loans
+export const interestPayments = pgTable("interest_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  loanId: varchar("loan_id").notNull().references(() => loanPositions.id),
+  borrowerWalletAddress: text("borrower_wallet_address").notNull(),
+  interestAmount: decimal("interest_amount", { precision: 18, scale: 9 }).notNull(),
+  paymentTxSignature: text("payment_tx_signature").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  loanIdx: index("interest_payments_loan_idx").on(table.loanId),
+}));
+
+export const insertLendingPoolSchema = createInsertSchema(lendingPool).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoanPositionSchema = createInsertSchema(loanPositions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCollateralValuationSchema = createInsertSchema(collateralValuations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInterestPaymentSchema = createInsertSchema(interestPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LendingPool = typeof lendingPool.$inferSelect;
+export type InsertLendingPool = z.infer<typeof insertLendingPoolSchema>;
+export type LoanPosition = typeof loanPositions.$inferSelect;
+export type InsertLoanPosition = z.infer<typeof insertLoanPositionSchema>;
+export type CollateralValuation = typeof collateralValuations.$inferSelect;
+export type InsertCollateralValuation = z.infer<typeof insertCollateralValuationSchema>;
+export type InterestPayment = typeof interestPayments.$inferSelect;
+export type InsertInterestPayment = z.infer<typeof insertInterestPaymentSchema>;
+
+// ============================================================================
+// END MEMECOIN CREDIT SYSTEM TABLES
+// ============================================================================
+
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
   createdAt: true,

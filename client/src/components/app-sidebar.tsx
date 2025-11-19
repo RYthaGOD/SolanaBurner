@@ -1,4 +1,4 @@
-import { Home, Plus, History, Settings, Flame, TrendingUp, DollarSign, Brain, Shield } from "lucide-react";
+import { Home, Plus, History, Settings, Flame, TrendingUp, DollarSign, Brain, Shield, Coins } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +41,11 @@ const menuItems = [
     title: "Blacklist",
     url: "/dashboard/blacklist",
     icon: Shield,
+  },
+  {
+    title: "Lending",
+    url: "/dashboard/lending",
+    icon: Coins,
   },
   {
     title: "Transactions",

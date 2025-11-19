@@ -113,6 +113,9 @@ export async function triggerGracefulShutdown() {
 
   // Initialize scheduler
   await scheduler.initialize();
+  
+  // Initialize lending system health monitor
+  await scheduler.initializeLendingMonitor();
 
   // Initialize AI trading bot scheduler
   startAITradingBotScheduler();

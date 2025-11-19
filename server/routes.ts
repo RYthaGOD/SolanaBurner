@@ -3159,6 +3159,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // MEMECOIN CREDIT SYSTEM ROUTES
+  // ============================================================================
+
+  // Get lending pool stats for a lender
+  app.get("/api/lending/pool/:lenderWallet", async (req, res) => {
+    try {
+      const { getLenderPoolStats } = await import("./lending-service");
+      const stats = await getLenderPoolStats(req.params.lenderWallet);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Deposit SOL to lending pool
+  app.post("/api/lending/deposit", async (req, res) => {
+    try {
+      const { lenderWalletAddress, depositedSOL, txSignature } = req.body;
+      
+      if (!lenderWalletAddress || !depositedSOL || !txSignature) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { depositToPool } = await import("./lending-service");
+      const result = await depositToPool(lenderWalletAddress, depositedSOL, txSignature);
+      
+      if (result.success) {
+        res.json({ success: true, poolId: result.poolId });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Withdraw SOL from lending pool
+  app.post("/api/lending/withdraw", async (req, res) => {
+    try {
+      const { lenderWalletAddress, withdrawSOL } = req.body;
+      
+      if (!lenderWalletAddress || !withdrawSOL) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { withdrawFromPool } = await import("./lending-service");
+      const result = await withdrawFromPool(lenderWalletAddress, withdrawSOL);
+      
+      if (result.success) {
+        res.json({ success: true, availableSOL: result.availableSOL });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Check if token is eligible as collateral
+  app.get("/api/lending/check-collateral/:tokenMint", async (req, res) => {
+    try {
+      const { isTokenEligibleAsCollateral } = await import("./lending-service");
+      const result = await isTokenEligibleAsCollateral(req.params.tokenMint);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get LTV info for a token based on market cap
+  app.get("/api/lending/ltv-info/:tokenMint", async (req, res) => {
+    try {
+      const { getTokenInfo, getLTVForMarketCap, calculateMaxBorrowAmount } = await import("./lending-service");
+      
+      const tokenInfo = await getTokenInfo(req.params.tokenMint);
+      if (!tokenInfo) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+
+      const { ltv, liquidationThreshold } = getLTVForMarketCap(tokenInfo.marketCapUSD);
+      
+      // Calculate max borrow for example collateral value
+      const exampleCollateralSOL = 100;
+      const maxBorrow = calculateMaxBorrowAmount(exampleCollateralSOL, tokenInfo.marketCapUSD);
+
+      res.json({
+        tokenInfo,
+        ltv,
+        liquidationThreshold,
+        example: {
+          collateralSOL: exampleCollateralSOL,
+          maxBorrowSOL: maxBorrow.toFixed(4),
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a loan
+  app.post("/api/lending/borrow", async (req, res) => {
+    try {
+      const { borrowerWalletAddress, borrowSOL, collateralTokenMint, collateralAmount, txSignature } = req.body;
+      
+      if (!borrowerWalletAddress || !borrowSOL || !collateralTokenMint || !collateralAmount || !txSignature) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { createLoan } = await import("./lending-service");
+      const result = await createLoan(
+        borrowerWalletAddress,
+        borrowSOL,
+        collateralTokenMint,
+        collateralAmount,
+        txSignature
+      );
+      
+      if (result.success) {
+        res.json({ success: true, loanId: result.loanId });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Repay a loan
+  app.post("/api/lending/repay", async (req, res) => {
+    try {
+      const { loanId, repaymentAmount, txSignature } = req.body;
+      
+      if (!loanId || !repaymentAmount || !txSignature) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { repayLoan } = await import("./lending-service");
+      const result = await repayLoan(loanId, repaymentAmount, txSignature);
+      
+      if (result.success) {
+        res.json({ success: true, remainingDebt: result.remainingDebt });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get borrower's active loans
+  app.get("/api/lending/loans/:borrowerWallet", async (req, res) => {
+    try {
+      const { getBorrowerLoans } = await import("./lending-service");
+      const loans = await getBorrowerLoans(req.params.borrowerWallet);
+      res.json(loans);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get total available liquidity
+  app.get("/api/lending/liquidity", async (req, res) => {
+    try {
+      const { getTotalAvailableLiquidity } = await import("./lending-service");
+      const liquidity = await getTotalAvailableLiquidity();
+      res.json({ totalAvailableSOL: liquidity });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update loan valuation (health check)
+  app.post("/api/lending/update-valuation/:loanId", async (req, res) => {
+    try {
+      const { updateLoanValuation } = await import("./lending-service");
+      const result = await updateLoanValuation(req.params.loanId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Liquidate a loan
+  app.post("/api/lending/liquidate", async (req, res) => {
+    try {
+      const { loanId, txSignature } = req.body;
+      
+      if (!loanId || !txSignature) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const { liquidateLoan } = await import("./lending-service");
+      const result = await liquidateLoan(loanId, txSignature);
+      
+      if (result.success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ success: false, error: result.error });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get protocol treasury stats
+  app.get("/api/lending/treasury", async (req, res) => {
+    try {
+      const { getProtocolTreasuryStats } = await import("./lending-service");
+      const stats = await getProtocolTreasuryStats();
+      res.json(stats || { totalBorrowFees: "0", totalInterestSpread: "0", totalRevenue: "0" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get AI risk analysis for a token
+  app.get("/api/lending/risk-analysis/:tokenMint", async (req, res) => {
+    try {
+      const { analyzeTokenRiskWithDeepSeek, getHolderDistribution } = await import("./lending-ai-analysis");
+      const { getTokenInfo } = await import("./lending-service");
+      
+      const tokenInfo = await getTokenInfo(req.params.tokenMint);
+      if (!tokenInfo) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+
+      const holderDistribution = await getHolderDistribution(req.params.tokenMint);
+      const riskAnalysis = await analyzeTokenRiskWithDeepSeek(
+        req.params.tokenMint,
+        tokenInfo,
+        holderDistribution
+      );
+
+      res.json({
+        tokenInfo,
+        riskAnalysis,
+        holderDistribution,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // END MEMECOIN CREDIT SYSTEM ROUTES
+  // ============================================================================
+
   const httpServer = createServer(app);
   return httpServer;
 }
