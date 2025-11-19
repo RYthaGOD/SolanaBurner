@@ -43,6 +43,18 @@ export default function Lending() {
   const [tokenEligibility, setTokenEligibility] = useState<any>(null);
   const [isCheckingToken, setIsCheckingToken] = useState(false);
   
+  // Fee distribution preview
+  const { data: distributionPreview } = useQuery<any>({
+    queryKey: ["/api/lending/distribution/preview"],
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  // Current lender APY
+  const { data: apyData } = useQuery<{ apy: number }>({
+    queryKey: ["/api/lending/apy"],
+    refetchInterval: 300000, // Refresh every 5 minutes
+  });
+  
   // Repayment state
   const [selectedLoan, setSelectedLoan] = useState<string>("");
   const [repayAmount, setRepayAmount] = useState("");
@@ -144,19 +156,27 @@ export default function Lending() {
       setTokenEligibility(response);
       
       if (!response.eligible) {
+        const riskInfo = response.riskAnalysis 
+          ? ` AI Risk: ${response.riskAnalysis.riskScore}/100. ${response.riskAnalysis.concerns[0] || ""}`
+          : "";
         toast({
           title: "Token Not Eligible",
-          description: response.reason,
+          description: response.reason + riskInfo,
           variant: "destructive",
         });
       } else {
         // Fetch LTV info
         const ltvInfo = await apiRequest(`/api/lending/ltv-info/${collateralToken}`);
-        setTokenEligibility({ ...response, ltvInfo });
+        
+        // Get AI risk analysis
+        const riskAnalysis = response.riskAnalysis || {};
+        const aiAdjustedLTV = response.adjustedLTV || ltvInfo.ltv;
+        
+        setTokenEligibility({ ...response, ltvInfo: { ...ltvInfo, ltv: aiAdjustedLTV } });
         
         toast({
-          title: "Token Eligible",
-          description: `Market cap: $${response.tokenInfo.marketCapUSD.toLocaleString()} | LTV: ${ltvInfo.ltv}%`,
+          title: "Token Eligible ✓",
+          description: `Cap: $${(response.tokenInfo.marketCapUSD / 1000000).toFixed(1)}M | LTV: ${aiAdjustedLTV}% | Risk: ${riskAnalysis.riskScore || "N/A"}/100`,
         });
       }
     } catch (error: any) {

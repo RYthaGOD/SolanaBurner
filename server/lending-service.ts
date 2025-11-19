@@ -231,11 +231,14 @@ export async function withdrawFromPool(
 
 /**
  * Check if token is eligible as collateral (market cap >= 5M)
+ * Enhanced with AI risk analysis
  */
 export async function isTokenEligibleAsCollateral(tokenMint: string): Promise<{
   eligible: boolean;
   tokenInfo?: TokenInfo;
   reason?: string;
+  riskAnalysis?: any;
+  adjustedLTV?: number;
 }> {
   const tokenInfo = await getTokenInfo(tokenMint);
   
@@ -251,7 +254,25 @@ export async function isTokenEligibleAsCollateral(tokenMint: string): Promise<{
     };
   }
 
-  return { eligible: true, tokenInfo };
+  // Perform AI-powered risk analysis
+  const { checkCollateralEligibilityWithAI } = await import("./lending-ai-analysis");
+  const aiResult = await checkCollateralEligibilityWithAI(tokenMint, tokenInfo);
+
+  if (!aiResult.eligible) {
+    return {
+      eligible: false,
+      tokenInfo,
+      reason: aiResult.reason,
+      riskAnalysis: aiResult.riskAnalysis,
+    };
+  }
+
+  return { 
+    eligible: true, 
+    tokenInfo,
+    riskAnalysis: aiResult.riskAnalysis,
+    adjustedLTV: aiResult.adjustedLTV,
+  };
 }
 
 /**

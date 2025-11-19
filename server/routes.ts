@@ -3364,6 +3364,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current lender APY (dynamic based on protocol performance)
+  app.get("/api/lending/apy", async (req, res) => {
+    try {
+      const { calculateCurrentLenderAPY } = await import("./lending-fee-distribution");
+      const apy = await calculateCurrentLenderAPY();
+      res.json({ apy });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Preview next fee distribution
+  app.get("/api/lending/distribution/preview", async (req, res) => {
+    try {
+      const { previewNextDistribution } = await import("./lending-fee-distribution");
+      const preview = await previewNextDistribution();
+      res.json(preview);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get fee distribution history
+  app.get("/api/lending/distribution/history", async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+      const { getFeeDistributionHistory } = await import("./lending-fee-distribution");
+      const history = await getFeeDistributionHistory(days);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Manually trigger fee distribution (admin only in production)
+  app.post("/api/lending/distribution/trigger", async (req, res) => {
+    try {
+      const { distributeDailyFeesToLenders } = await import("./lending-fee-distribution");
+      const result = await distributeDailyFeesToLenders();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get AI risk analysis for a token
+  app.get("/api/lending/risk-analysis/:tokenMint", async (req, res) => {
+    try {
+      const { analyzeTokenRiskWithDeepSeek, getHolderDistribution } = await import("./lending-ai-analysis");
+      const { getTokenInfo } = await import("./lending-service");
+      
+      const tokenInfo = await getTokenInfo(req.params.tokenMint);
+      if (!tokenInfo) {
+        return res.status(404).json({ message: "Token not found" });
+      }
+
+      const holderDistribution = await getHolderDistribution(req.params.tokenMint);
+      const riskAnalysis = await analyzeTokenRiskWithDeepSeek(
+        req.params.tokenMint,
+        tokenInfo,
+        holderDistribution
+      );
+
+      res.json({
+        tokenInfo,
+        riskAnalysis,
+        holderDistribution,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============================================================================
   // END MEMECOIN CREDIT SYSTEM ROUTES
   // ============================================================================
