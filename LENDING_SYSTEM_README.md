@@ -6,9 +6,10 @@ A decentralized lending and borrowing platform that allows users to lend SOL for
 
 ### For Lenders
 - **Deposit SOL** into a lending pool stored in secure PDA vaults
-- **Earn 10% APR** on deposited funds
+- **Earn 8% APR** on deposited funds
 - **Withdraw anytime** (subject to pool liquidity)
 - Track total deposits, available balance, and interest earned
+- Protocol fees accumulate in treasury for future use
 
 ### For Borrowers
 - **Borrow SOL** against memecoin/SPL token collateral
@@ -40,7 +41,7 @@ The system uses tiered LTV ratios based on collateral token market capitalizatio
 2. Navigate to Dashboard → Lending
 3. Enter amount of SOL to deposit
 4. Confirm transaction
-5. Start earning 10% APR immediately
+5. Start earning 8% APR immediately
 
 ### Borrowing Flow
 1. Connect your Solana wallet
@@ -137,6 +138,8 @@ Tracks interest payments on loans
 #### System Endpoints
 - `POST /api/lending/update-valuation/:loanId` - Update loan health
 - `POST /api/lending/liquidate` - Liquidate under-collateralized loan
+- `GET /api/lending/treasury` - Get protocol treasury stats
+- `GET /api/lending/risk-analysis/:tokenMint` - Get AI risk analysis for token
 
 ### Frontend Components
 
@@ -157,14 +160,15 @@ Tracks interest payments on loans
 
 ### Risk Management
 - **Dynamic LTV** based on token stability (market cap)
+- **AI-powered risk analysis** using DeepSeek for collateral assessment
 - **Health monitoring** runs every hour
 - **Automatic liquidation** when LTV exceeds threshold
 - **PDA vaults** prevent unauthorized access to funds
 
-### Interest Rate
-- Fixed **10% APR** on all loans
-- Interest compounds continuously
-- Paid to lenders proportionally based on pool share
+### Interest Rates
+- Lenders earn: **8% APR** 
+- Borrowers pay: **12% APR** + 0.5% borrow fee
+- Protocol spread: **4% APR** + fees accumulate in treasury
 
 ## Automated Monitoring
 
@@ -211,9 +215,9 @@ Tests cover:
 // Deposit 100 SOL
 await depositToPool("YourWallet...", "100", "txSignature...");
 
-// Earn 10% APR = 10 SOL per year
+// Earn 8% APR = 8 SOL per year
 // Withdraw anytime (if liquidity available)
-await withdrawFromPool("YourWallet...", "110");
+await withdrawFromPool("YourWallet...", "108");
 ```
 
 ### As a Borrower

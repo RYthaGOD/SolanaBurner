@@ -560,14 +560,6 @@ class BuybackScheduler {
     
     this.tasks.push(lendingTask);
     console.log("Lending health monitor initialized - checking every hour");
-
-    // Distribute protocol fees to lenders daily at midnight UTC
-    const feeDistributionTask = cron.schedule("0 0 * * *", async () => {
-      await this.distributeDailyFees();
-    });
-    
-    this.tasks.push(feeDistributionTask);
-    console.log("Daily fee distribution initialized - running at midnight UTC");
   }
 
   private async monitorLoanHealth() {
@@ -578,22 +570,6 @@ class BuybackScheduler {
       console.log("✅ Loan health monitoring complete");
     } catch (error: any) {
       console.error("❌ Error monitoring loan health:", error);
-    }
-  }
-
-  private async distributeDailyFees() {
-    try {
-      console.log("💰 Starting daily fee distribution to lenders...");
-      const { distributeDailyFeesToLenders } = await import("./lending-fee-distribution");
-      const result = await distributeDailyFeesToLenders();
-      
-      if (result.success) {
-        console.log(`✅ Distributed ${result.totalDistributed.toFixed(6)} SOL to ${result.distributions.length} lenders`);
-      } else {
-        console.error("❌ Fee distribution failed:", result.error);
-      }
-    } catch (error: any) {
-      console.error("❌ Error in daily fee distribution:", error);
     }
   }
 }

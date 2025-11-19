@@ -3364,46 +3364,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current lender APY (dynamic based on protocol performance)
-  app.get("/api/lending/apy", async (req, res) => {
+  // Get protocol treasury stats
+  app.get("/api/lending/treasury", async (req, res) => {
     try {
-      const { calculateCurrentLenderAPY } = await import("./lending-fee-distribution");
-      const apy = await calculateCurrentLenderAPY();
-      res.json({ apy });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Preview next fee distribution
-  app.get("/api/lending/distribution/preview", async (req, res) => {
-    try {
-      const { previewNextDistribution } = await import("./lending-fee-distribution");
-      const preview = await previewNextDistribution();
-      res.json(preview);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Get fee distribution history
-  app.get("/api/lending/distribution/history", async (req, res) => {
-    try {
-      const days = parseInt(req.query.days as string) || 30;
-      const { getFeeDistributionHistory } = await import("./lending-fee-distribution");
-      const history = await getFeeDistributionHistory(days);
-      res.json(history);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Manually trigger fee distribution (admin only in production)
-  app.post("/api/lending/distribution/trigger", async (req, res) => {
-    try {
-      const { distributeDailyFeesToLenders } = await import("./lending-fee-distribution");
-      const result = await distributeDailyFeesToLenders();
-      res.json(result);
+      const { getProtocolTreasuryStats } = await import("./lending-service");
+      const stats = await getProtocolTreasuryStats();
+      res.json(stats || { totalBorrowFees: "0", totalInterestSpread: "0", totalRevenue: "0" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

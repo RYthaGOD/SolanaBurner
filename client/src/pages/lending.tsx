@@ -43,18 +43,6 @@ export default function Lending() {
   const [tokenEligibility, setTokenEligibility] = useState<any>(null);
   const [isCheckingToken, setIsCheckingToken] = useState(false);
   
-  // Fee distribution preview
-  const { data: distributionPreview } = useQuery<any>({
-    queryKey: ["/api/lending/distribution/preview"],
-    refetchInterval: 60000, // Refresh every minute
-  });
-
-  // Current lender APY
-  const { data: apyData } = useQuery<{ apy: number }>({
-    queryKey: ["/api/lending/apy"],
-    refetchInterval: 300000, // Refresh every 5 minutes
-  });
-  
   // Repayment state
   const [selectedLoan, setSelectedLoan] = useState<string>("");
   const [repayAmount, setRepayAmount] = useState("");
